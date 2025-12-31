@@ -235,7 +235,7 @@ export function Sidebar(props: SidebarProps & { isCollapsed?: boolean; onToggleC
       {/* Desktop sidebar */}
       <div
         className={cn(
-          "hidden md:flex border-r border-sidebar-border shrink-0 transition-all duration-300",
+          "hidden md:flex border-r border-sidebar-border shrink-0 transition-all duration-300 overflow-hidden",
           props.isCollapsed ? "w-16" : "w-64"
         )}
       >

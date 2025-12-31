@@ -23,7 +23,16 @@
       "Bash(gh issue create:*)",
       "Bash(gh issue comment:*)",
       "Bash(gh issue view:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(gh pr create --title \"Fix header alignment between sidebar and main content\" --body \"$\\(cat <<''EOF''\n## Summary\nFixes the header alignment issue between the sidebar and main content area.\n\n## Changes\n- Changed main content header class from `pl-14 md:pl-4 pr-4` to `px-3`\n- Both sidebar and main headers now use consistent padding\n- Ensures perfect alignment at 52px height\n\n## Fix recommended by\nClaudius Maximus \\(Claude running in Docker container\\)\n\nCloses #1\nEOF\n\\)\")",
+      "Bash(gh pr merge:*)",
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)",
+      "Bash(gh pr view:*)",
+      "Bash(git stash:*)",
+      "Bash(git stash pop:*)",
+      "Bash(gh pr close:*)",
+      "Bash(gh issue close:*)"
     ]
   }
 }
