@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 
 const BASE_URL = "https://api.cerebras.ai/v1";
 const API_KEY = process.env.CEREBRAS_API_KEY || "csk_pkp9dymmkfhdydthv46r9jnrxpntdw6wjkmvfnewe4rxny36";
-const MODEL = "zai-glm-4.6";
+const DEFAULT_MODEL = "llama-3.3-70b";
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json();
+    const { messages, model } = await req.json();
+    const selectedModel = model || DEFAULT_MODEL;
 
     const response = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
         Authorization: `Bearer ${API_KEY}`,
       },
       body: JSON.stringify({
-        model: MODEL,
+        model: selectedModel,
         messages,
         stream: true,
       }),
