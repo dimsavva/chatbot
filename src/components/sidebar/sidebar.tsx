@@ -84,7 +84,7 @@ function SidebarContent({
   };
 
   return (
-    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
+    <div className="flex flex-col h-full w-full bg-sidebar text-sidebar-foreground">
       {/* Header */}
       <div className={cn("px-3 flex items-center gap-2 h-[52px] border-b border-sidebar-border", isCollapsed ? "justify-center" : "justify-between")}>
         {!isCollapsed && (
