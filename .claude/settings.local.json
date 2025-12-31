@@ -17,7 +17,13 @@
       "Bash(docker exec:*)",
       "Bash(python claudius.py:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "mcp__chrome-devtools__select_page",
+      "Bash(gh issue create:*)",
+      "Bash(gh issue comment:*)",
+      "Bash(gh issue view:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

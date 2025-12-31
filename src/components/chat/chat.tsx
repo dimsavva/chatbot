@@ -197,7 +197,7 @@ export function Chat() {
 
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* Header with model selector */}
-        <div className="flex items-center border-b border-border shrink-0 h-[52px] pl-14 md:pl-4 pr-4">
+        <div className="flex items-center border-b border-border shrink-0 h-[52px] px-3">
           <div className="flex flex-col">
             <div className="flex items-center gap-1">
               <ModelSelector

@@ -1,0 +1,35 @@
+uid=34_0 RootWebArea "Create Next App" url="http://localhost:3000/"
+  uid=34_1 StaticText "Open WebUI"
+  uid=34_2 button "Collapse sidebar"
+  uid=34_3 button "New Chat"
+  uid=34_4 button "Search"
+  uid=34_5 button "Notes"
+  uid=34_6 button "Workspace"
+  uid=34_7 button "Folders"
+  uid=34_8 StaticText "Chats"
+  uid=34_9 heading "Today" level="3"
+  uid=34_10 StaticText "New Chat"
+  uid=34_11 button
+  uid=34_12 StaticText "Show me a code snippet for imp..."
+  uid=34_13 button
+  uid=34_14 StaticText "New Chat"
+  uid=34_15 button
+  uid=34_16 StaticText "New Chat"
+  uid=34_17 button
+  uid=34_18 StaticText "Help me study vocabulary for a..."
+  uid=34_19 button
+  uid=34_20 StaticText "U"
+  uid=34_21 StaticText "User"
+  uid=34_22 button "zai-glm-4.6" expandable haspopup="menu"
+  uid=34_23 button "New model"
+  uid=34_24 StaticText "Set as default"
+  uid=34_25 StaticText "zai-glm-4.6"
+  uid=34_26 button
+  uid=34_27 button
+  uid=34_28 textbox "How can I help you today?" multiline
+  uid=34_29 button disableable disabled
+  uid=34_30 StaticText "Suggested"
+  uid=34_31 button "Help me study vocabulary for a college entrance exam"
+  uid=34_32 button "Show me a code snippet of a website's sticky header"
+  uid=34_33 button "Give me ideas for what to do with my kids' art"
+  uid=34_34 button "Open Next.js Dev Tools" expandable haspopup="menu"
