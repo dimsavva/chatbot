@@ -1,37 +1,124 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Bot, User, Loader2, Plus } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Sidebar } from "@/components/sidebar/sidebar";
+import { ModelSelector } from "./model-selector";
+import { SuggestedPrompts } from "./suggested-prompts";
+import { ChatInput } from "./chat-input";
+import {
+  Message,
+  Chat as ChatType,
+  getChat,
+  createChat,
+  addMessage,
+  updateLastMessage,
+  getCurrentChatId,
+  setCurrentChatId,
+  getSelectedModel,
+  setSelectedModel,
+  DEFAULT_MODEL,
+} from "@/lib/chat-store";
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
+const SIDEBAR_COLLAPSED_KEY = "chatbot-sidebar-collapsed";
 
 export function Chat() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
+  const [currentChat, setCurrentChat] = useState<ChatType | null>(null);
+  const [selectedModel, setSelectedModelState] = useState(DEFAULT_MODEL);
   const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [pendingPrompt, setPendingPrompt] = useState<string>("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Initialize from localStorage
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    const savedModel = getSelectedModel();
+    setSelectedModelState(savedModel);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    const currentId = getCurrentChatId();
+    if (currentId) {
+      const chat = getChat(currentId);
+      if (chat) {
+        setCurrentChat(chat);
+      }
+    }
+
+    // Load sidebar state
+    const savedCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    if (savedCollapsed === "true") {
+      setSidebarCollapsed(true);
+    }
+  }, []);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [currentChat?.messages]);
+
+  const handleToggleSidebar = () => {
+    const newState = !sidebarCollapsed;
+    setSidebarCollapsed(newState);
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(newState));
+  };
+
+  const handleModelChange = (model: string) => {
+    setSelectedModelState(model);
+    setSelectedModel(model);
+  };
+
+  const handleNewChat = useCallback(() => {
+    const newChat = createChat(selectedModel);
+    setCurrentChat(newChat);
+    setRefreshKey((k) => k + 1);
+  }, [selectedModel]);
+
+  const handleSelectChat = useCallback((chatId: string) => {
+    const chat = getChat(chatId);
+    if (chat) {
+      setCurrentChat(chat);
+      setCurrentChatId(chatId);
+    }
+  }, []);
+
+  const handleDeleteChat = useCallback((chatId: string) => {
+    if (currentChat?.id === chatId) {
+      setCurrentChat(null);
+      setCurrentChatId(null);
+    }
+    setRefreshKey((k) => k + 1);
+  }, [currentChat?.id]);
+
+  const handleSelectPrompt = (prompt: string) => {
+    setPendingPrompt(prompt);
+  };
+
+  const handleSubmit = async (input: string) => {
     if (!input.trim() || isLoading) return;
 
+    // Create new chat if none exists
+    let chat = currentChat;
+    if (!chat) {
+      chat = createChat(selectedModel);
+      setCurrentChat(chat);
+      setRefreshKey((k) => k + 1);
+    }
+
     const userMessage: Message = { role: "user", content: input.trim() };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
+
+    // Add user message to chat
+    const updatedChat = addMessage(chat.id, userMessage);
+    if (updatedChat) {
+      setCurrentChat(updatedChat);
+      setRefreshKey((k) => k + 1);
+    }
+
+    setPendingPrompt("");
     setIsLoading(true);
 
     try {
@@ -39,10 +126,11 @@ export function Chat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [...messages, userMessage].map((m) => ({
+          messages: [...(updatedChat?.messages || [])].map((m) => ({
             role: m.role,
             content: m.content,
           })),
+          model: selectedModel,
         }),
       });
 
@@ -56,7 +144,11 @@ export function Chat() {
       const decoder = new TextDecoder();
       let assistantMessage = "";
 
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      // Add empty assistant message
+      const chatWithAssistant = addMessage(chat.id, { role: "assistant", content: "" });
+      if (chatWithAssistant) {
+        setCurrentChat(chatWithAssistant);
+      }
 
       while (true) {
         const { done, value } = await reader.read();
@@ -65,91 +157,140 @@ export function Chat() {
         const chunk = decoder.decode(value);
         assistantMessage += chunk;
 
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last.role === "assistant") {
-            return [...prev.slice(0, -1), { ...last, content: assistantMessage }];
-          }
-          return prev;
-        });
+        // Update the last message with streaming content
+        const updated = updateLastMessage(chat.id, assistantMessage);
+        if (updated) {
+          setCurrentChat(updated);
+        }
       }
+
+      setRefreshKey((k) => k + 1);
     } catch (error) {
       console.error("Error:", error);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Sorry, something went wrong. Please try again." },
-      ]);
+      addMessage(chat.id, {
+        role: "assistant",
+        content: "Sorry, something went wrong. Please try again.",
+      });
+      const errorChat = getChat(chat.id);
+      if (errorChat) {
+        setCurrentChat(errorChat);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
+  const messages = currentChat?.messages || [];
+  const isEmpty = messages.length === 0;
+
   return (
-    <Card className="w-full max-w-2xl mx-auto h-[600px] flex flex-col">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="h-6 w-6" />
-          Chat Assistant
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
-        <ScrollArea ref={scrollRef} className="flex-1 p-4">
-          <div className="space-y-4">
-            {messages.length === 0 && (
-              <div className="text-center text-muted-foreground py-8">
-                <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Start a conversation with the assistant</p>
-              </div>
-            )}
-            {messages.map((message, index) => (
-              <div
-                key={index}
-                className={`flex gap-3 ${
-                  message.role === "user" ? "flex-row-reverse" : ""
-                }`}
-              >
-                <Avatar>
-                  <AvatarFallback>
-                    {message.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                  </AvatarFallback>
-                </Avatar>
-                <div
-                  className={`rounded-lg px-4 py-2 max-w-[80%] ${
-                    message.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap text-sm">{message.content}</p>
-                </div>
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex gap-3">
-                <Avatar>
-                  <AvatarFallback>
-                    <Bot className="h-4 w-4" />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="bg-muted rounded-lg px-4 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                </div>
-              </div>
-            )}
+    <div className="flex h-screen bg-background overflow-hidden">
+      <Sidebar
+        currentChatId={currentChat?.id || null}
+        onSelectChat={handleSelectChat}
+        onNewChat={handleNewChat}
+        onDeleteChat={handleDeleteChat}
+        refreshKey={refreshKey}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={handleToggleSidebar}
+      />
+
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        {/* Header - Fixed height 52px with matching border style to sidebar */}
+        <div className="flex items-center border-b border-border shrink-0 h-[52px] pl-14 md:pl-4 pr-4">
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1">
+              <ModelSelector
+                selectedModel={selectedModel}
+                onModelChange={handleModelChange}
+              />
+              <Button variant="ghost" size="icon" className="h-7 w-7" title="New model">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <span className="text-[10px] text-muted-foreground pl-3">Set as default</span>
           </div>
-        </ScrollArea>
-        <form onSubmit={handleSubmit} className="p-4 border-t flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message..."
-            disabled={isLoading}
-          />
-          <Button type="submit" disabled={isLoading || !input.trim()}>
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+
+        {/* Main content area */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {isEmpty ? (
+            // Empty state
+            <div className="flex-1 flex flex-col items-center justify-center p-4">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center gap-2 mb-4">
+                  <span className="text-2xl font-semibold">{selectedModel}</span>
+                </div>
+              </div>
+              <ChatInput
+                onSubmit={handleSubmit}
+                disabled={isLoading}
+                initialValue={pendingPrompt}
+              />
+              <SuggestedPrompts onSelectPrompt={handleSelectPrompt} />
+            </div>
+          ) : (
+            // Chat view
+            <>
+              <div
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto"
+              >
+                <div className="max-w-3xl mx-auto p-4 space-y-6">
+                  {messages.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`flex gap-4 ${
+                        message.role === "user" ? "flex-row-reverse" : ""
+                      }`}
+                    >
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarFallback className={message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}>
+                          {message.role === "user" ? (
+                            <User className="h-4 w-4" />
+                          ) : (
+                            <Bot className="h-4 w-4" />
+                          )}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div
+                        className={`rounded-2xl px-4 py-3 max-w-[80%] ${
+                          message.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted"
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap text-sm">
+                          {message.content}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {isLoading && messages[messages.length - 1]?.role === "user" && (
+                    <div className="flex gap-4">
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarFallback className="bg-muted">
+                          <Bot className="h-4 w-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="bg-muted rounded-2xl px-4 py-3">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+              <div className="p-4 border-t border-border shrink-0">
+                <ChatInput
+                  onSubmit={handleSubmit}
+                  disabled={isLoading}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
